@@ -1,0 +1,101 @@
+name: ifile_package
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write  # 允许创建 release
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+    - name: 拉取代码
+      uses: actions/checkout@v4
+
+    - name: 设置 Node.js 环境
+      uses: actions/setup-node@v3
+      with:
+        node-version: '22'
+
+    - name: 安装 pnpm
+      run: npm install -g pnpm
+
+    - name: 安装 web 依赖
+      working-directory: ./ifile_frontend
+      run: pnpm install
+
+    - name: 构建前端项目
+      working-directory: ./ifile_frontend
+      run: pnpm run build
+
+    - name: 安装 Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.23'
+
+    - name: 编译 Go 项目
+      working-directory: ./
+      shell: bash
+      run: |
+        if [ "${{ matrix.os }}" == "windows-latest" ]; then
+          go build -o ifile.exe .
+        else
+          go build -o ifile .
+        fi
+
+    - name: 打包为 zip
+      working-directory: ./
+      shell: bash
+      run: |
+        if [ "${{ matrix.os }}" == "windows-latest" ]; then
+          powershell Compress-Archive -Path ifile.exe,static\* -DestinationPath ifile_windows.zip
+        else
+          zip -r ifile_ubuntu.zip ifile static
+        fi
+
+    - name: 上传打包产物
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.os == 'windows-latest' && 'ifile_windows' || 'ifile_ubuntu' }}
+        path: ${{ matrix.os == 'windows-latest' && 'ifile_windows.zip' || 'ifile_ubuntu.zip' }}
+
+
+  release:
+      runs-on: ubuntu-latest
+      needs: build
+      steps:
+        - name: 下载 Windows 产物
+          uses: actions/download-artifact@v4
+          with:
+            name: ifile_windows
+            path: ./release
+
+        - name: 下载 Ubuntu 产物
+          uses: actions/download-artifact@v4
+          with:
+            name: ifile_ubuntu
+            path: ./release
+
+        - name: 设置短 SHA
+          run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
+
+        - name: 设置动态版本号
+          run: echo "RELEASE_TAG=v0.${{ github.run_number }}" >> $GITHUB_ENV
+
+        - name: 创建 Release 并上传 zip
+          uses: softprops/action-gh-release@v2
+          with:
+            tag_name: "v0-${{ github.run_number }}-${{ env.SHORT_SHA }}"
+            name: "Release v0-${{ github.run_number }}-${{ env.SHORT_SHA }}"
+            files: |
+              ./release/ifile_windows.zip
+              ./release/ifile_ubuntu.zip
+          env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
