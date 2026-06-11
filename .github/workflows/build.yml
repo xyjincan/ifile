@@ -39,7 +39,9 @@ jobs:
 
     - name: 构建前端项目
       working-directory: ./ifile_frontend
-      run: pnpm run build
+      run: |
+        pnpm config set only-built-dependencies esbuild
+        pnpm run build
 
     - name: 安装 Go
       uses: actions/setup-go@v4
