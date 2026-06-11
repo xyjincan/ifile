@@ -26,7 +26,7 @@ jobs:
     - name: 设置 Node.js 环境
       uses: actions/setup-node@v4
       with:
-        node-version: '22'
+        node-version: 'latest'
 
     # 3. 挂载 pnpm 高速静态缓存
     - name: 获取 pnpm 缓存路径
