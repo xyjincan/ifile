@@ -36,12 +36,26 @@ func viewFile(c *gin.Context) {
 		c.JSON(404, res)
 		return
 	}
-	targetPath := filepath.Join(root, parent)
+	_root := filepath.Clean(root)
+	targetPath := filepath.Join(_root, parent)
 	cleanPath := filepath.Clean(targetPath)
-	if !strings.HasPrefix(cleanPath, root) {
-		c.JSON(400, gin.H{"error": "Invalid path specified"})
+
+	relPath, err := filepath.Rel(_root, cleanPath) // 禁止穿越、逃逸
+	if err != nil || strings.HasPrefix(relPath, "..") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_file"})
 		return
 	}
+	realPath, err := filepath.EvalSymlinks(cleanPath) // 禁止链接
+	if err != nil || !strings.EqualFold(realPath, cleanPath) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_file"})
+		return
+	}
+	fileInfo, err := os.Stat(cleanPath)
+	if err != nil || fileInfo.IsDir() {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "access_denied_file"})
+		return
+	}
+
 	view_file(c, cleanPath)
 }
 
