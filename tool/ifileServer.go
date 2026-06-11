@@ -29,10 +29,11 @@ var config Config
 */
 func load() Config {
 	// 打开 JSON 文件
-	file, err := os.Open("./config.json")
+	file_path := "./config.json"
+	file, err := os.Open(file_path)
 	if err != nil {
 		fmt.Println("Error opening file:", err)
-		return config
+		return Config{}
 	}
 	defer file.Close()
 	// 解码 JSON 数据
@@ -40,7 +41,7 @@ func load() Config {
 	err = decoder.Decode(&config)
 	if err != nil {
 		fmt.Println("Error decoding JSON:", err)
-		return config
+		return Config{}
 	}
 	fmt.Println("Paths:", config.Paths)
 	return config
